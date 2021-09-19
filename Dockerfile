@@ -2,7 +2,7 @@ FROM alpine:3.13
 
 LABEL org.opencontainers.image.source="https://github.com/muratgozel/nginx"
 LABEL org.opencontainers.image.title="nginx"
-LABEL org.opencontainers.image.description="Nginx server with multi host, brotli and javascript support."
+LABEL org.opencontainers.image.description="Nginx server with multi host, letsencrypt, brotli and javascript support."
 
 ENV LANG=en_US.utf8
 
