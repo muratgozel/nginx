@@ -8,7 +8,7 @@ ENV LANG=en_US.utf8
 
 RUN apk add --no-cache --virtual .build-deps gcc g++ make tcl wget pkgconf \
     dpkg-dev pcre-dev openssl-dev zlib-dev && \
-    apk add --no-cache mercurial git openssl curl ca-certificates && \
+    apk add --no-cache bash mercurial git openssl curl ca-certificates && \
     mkdir -p /downloads && cd /downloads && \
     # install nginx
     printf "%s%s%s\n" "http://nginx.org/packages/alpine/v" `egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release` "/main" | tee -a /etc/apk/repositories && \
