@@ -1,0 +1,14 @@
+{
+  "versioning": {
+    "scheme": "semver"
+  },
+  "github": {
+    "enable": true,
+    "release": true
+  },
+  "docker": {
+    "enable": true,
+    "user": "muratgozel",
+    "repo": "nginx"
+  }
+}
