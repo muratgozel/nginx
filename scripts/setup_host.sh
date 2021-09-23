@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
-# import aliases (nginx for example)
-shopt -s expand_aliases && source ~/.bash_aliases
-
-source ./setup/functions.sh
+source /scripts/functions.sh
 
 usage() {
   cat <<USAGE >&2
@@ -14,13 +11,12 @@ Sets up a new nginx host.
 OPTIONS:
   --help                Show this message
 
-  --host                The name of the host.
+  --template            [Required] Nginx host template that new host will be created on.
 
-  --letsencrypt-email   The email address for acquiring ssl certs.
-
-  --root-dir            [Default=/srv/$host/live] Hosts root dir.
-
-  --conf-dir            [Default=nginx/conf.d-templates] Local conf dir that contains nginx configuration file templates.
+ENV:
+  NGINX_HOST            [Required] The name of the host.
+  NGINX_ROOT_PARENT     [Required] The folder that will contain NGINX_HOST folder.
+  LETSENCRYPT_EMAIL     Letsencrypt email.
 USAGE
 }
 
@@ -30,36 +26,18 @@ while true; do
       usage
       exit 1
       ;;
+    --template)
+      if [[ -z "$2" ]]; then
+        fail "Missing flag: template."
+      fi
+      template="$2"
+      shift 2
+      ;;
     --host)
-      if [[ -z "$2" ]]; then
-        fail "Missing flag: host."
+      if [[ -z "$2" ]] && [[ -z $NGINX_HOST ]]; then
+        fail "Missing flag: host. Or set NGINX_HOST as environment variable."
       fi
-      host="$2"
-      shift 2
-      ;;
-    --letsencrypt-email)
-      if [[ -z "$2" ]]; then
-        info "Won't install ssl certs because didn't specified letsencrypt-email flag."
-      fi
-      letsencrypt_email="$2"
-      shift 2
-      ;;
-    --root-dir)
-      if [[ -z "$2" ]]; then
-        root_dir="/srv/$host/live"
-        info "Using default root dir $root_dir"
-      else
-        root_dir="$2"
-      fi
-      shift 2
-      ;;
-    --conf-dir)
-      if [[ -z "$2" ]]; then
-        conf_dir="nginx/conf.d-templates/"
-        info "Using default conf dir $conf_dir"
-      else
-        conf_dir="$2"
-      fi
+      NGINX_HOST="$2"
       shift 2
       ;;
     *)
@@ -68,15 +46,51 @@ while true; do
   esac
 done
 
-# create host web directory
+conf_dir="/etc/nginx/templates"
+root_dir="$NGINX_ROOT_PARENT/$NGINX_HOST/live"
+NGINX_HOST_WWW=""
+if ! is_subdomain $NGINX_HOST; then
+  NGINX_HOST_WWW="www.$NGINX_HOST"
+fi
+
+# create host live directory
 mkdir -p "$root_dir"
 
-# setup nginx hosts
-if [[ ! -f "/etc/nginx/conf.d/acme.challenge.conf" ]]; then
-  cp "${conf_dir}acme.challenge.conf" "/etc/nginx/conf.d/acme.challenge.conf"
-fi
-cp "${conf_dir}${host}.conf" "/etc/nginx/conf.d/${host}.conf"
-cp "${conf_dir}${host}.http.conf" "/etc/nginx/conf.d/${host}.http.conf"
+# create http and https conf templates
+/bin/cat <<EOM >/etc/nginx/templates/$NGINX_HOST.http.conf
+server {
+  listen 80;
+  listen [::]:80;
+
+  include /etc/nginx/conf.d/$NGINX_HOST.conf;
+}
+EOM
+/bin/cat <<EOM >/etc/nginx/templates/$NGINX_HOST.https.conf
+server {
+  listen [::]:443 ssl;
+  listen 443 ssl;
+  ssl_certificate /etc/letsencrypt/live/$NGINX_HOST/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/$NGINX_HOST/privkey.pem;
+
+  include /etc/letsencrypt/nginx-ssl-options.conf;
+  include /etc/nginx/conf.d/$NGINX_HOST.conf;
+}
+
+server {
+  if (\$host = $NGINX_HOST) {
+    return 301 https://\$host\$request_uri;
+  }
+
+  listen 80;
+  listen [::]:80;
+  server_name $NGINX_HOST;
+  return 404;
+}
+EOM
+
+# parse templates and output to nginx conf dir
+envsubst '$NGINX_HOST $NGINX_ROOT_PARENT $NGINX_HOST_WWW' < /etc/nginx/templates/$template.conf > /etc/nginx/conf.d/$NGINX_HOST.conf
+envsubst '$NGINX_HOST $NGINX_ROOT_PARENT $NGINX_HOST_WWW' < /etc/nginx/templates/$NGINX_HOST.http.conf > /etc/nginx/conf.d/$NGINX_HOST.http.conf
 
 # test nginx
 nginx -t 2>/dev/null > /dev/null
@@ -85,18 +99,18 @@ if [[ $? != 0 ]]; then
 fi
 nginx -s reload
 
-if [[ ! -z $letsencrypt_email ]]; then
+if [[ ! -z $LETSENCRYPT_EMAIL ]]; then
   # create ssl certs
   www_cmd=""
-  if ! is_subdomain $host; then
-    www_cmd="-d www.$host"
+  if ! is_subdomain $NGINX_HOST; then
+    www_cmd="-d www.$NGINX_HOST"
   fi
   certbot certonly --webroot --non-interactive --redirect --agree-tos \
-    --email $letsencrypt_email --no-eff-email \
-    -w /srv/$host/live -d $host $www_cmd
+    --email $LETSENCRYPT_EMAIL --no-eff-email \
+    -w $root_dir -d $NGINX_HOST $www_cmd
 
-  # setup nginx host for https
-  cp "${conf_dir}${host}.https.conf" "/etc/nginx/conf.d/$host.https.conf"
+  # parse https template and output to nginx conf dir
+  envsubst '$NGINX_HOST $NGINX_ROOT_PARENT $NGINX_HOST_WWW' < /etc/nginx/templates/$template.https.conf > /etc/nginx/conf.d/$NGINX_HOST.https.conf
 
   # test nginx
   nginx -t 2>/dev/null > /dev/null
@@ -105,7 +119,7 @@ if [[ ! -z $letsencrypt_email ]]; then
   fi
   nginx -s reload
 
-  rm "/etc/nginx/conf.d/$host.http.conf"
+  rm "/etc/nginx/conf.d/$NGINX_HOST.http.conf"
 fi
 
-success "Host ($host) setup completed."
+success "Host ($NGINX_HOST) setup completed."

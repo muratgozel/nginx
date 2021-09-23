@@ -9,6 +9,7 @@
   "docker": {
     "enable": true,
     "user": "muratgozel",
-    "repo": "nginx"
+    "repo": "nginx",
+    "registry": "ghcr.io"
   }
 }
