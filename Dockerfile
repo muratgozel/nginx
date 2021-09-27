@@ -42,7 +42,7 @@ RUN apk add --no-cache --virtual .build-deps gcc g++ make tcl wget pkgconf \
     apk add --no-cache gettext
 
 COPY ./nginx.conf /etc/nginx/nginx.conf
-COPY ./acme.challenge.conf /etc/nginx/conf.d/acme.challenge.conf
+COPY ./acme.challenge.conf /etc/nginx/acme.challenge.conf
 COPY ./scripts /scripts
 
 # configure file and folder permissions
