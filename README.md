@@ -60,10 +60,11 @@ After setup completes, `$NGINX_HOST` will be accessible through http(s). Anythin
 ### Review nginx.conf
 An nginx.conf file is required for base nginx configuration. The important part in this file is include directives:
 ```conf
+include /etc/nginx/common.conf;
 include /etc/nginx/conf.d/*.http.conf;
 include /etc/nginx/conf.d/*.https.conf;
 ```
-These directives used by the image when managing hosts. So keep them there. You can review and change if you want other parts of the `nginx.conf` file.
+The last two directives used by the image when managing hosts. So keep them there. The common.conf file is for upstreams and anything that can be placed inside http block. You need to create a volume that points to `/etc/nginx/common.conf` to include it.
 
 ---
 
