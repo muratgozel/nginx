@@ -1,4 +1,4 @@
-FROM alpine:3.13
+FROM alpine:3.14
 
 LABEL org.opencontainers.image.source="https://github.com/muratgozel/nginx"
 LABEL org.opencontainers.image.title="nginx"
